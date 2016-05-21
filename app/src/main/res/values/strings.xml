@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">TechnocratSignalAndroid</string>
+    <string name="action_settings">Settings</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="pick_group">Which signals will you monitor?</string>
+    <string-array
+        name="choices">
+        <item>one</item>
+        <item>two</item>
+        <item>three</item>
+    </string-array>
+
+</resources>
