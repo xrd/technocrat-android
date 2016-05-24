@@ -1,5 +1,7 @@
 package com.inqry.technocratsignal;
 
+import java.util.HashMap;
+
 /**
  * Created by chrx on 3/9/16.
  */
@@ -15,7 +17,6 @@ void setUrl( String url );
 
     boolean isInitialized();
 
-    String[] poll();
+    HashMap<String,Boolean> poll();
 
-    String[] getOptions();
 }

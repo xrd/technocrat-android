@@ -33,40 +33,43 @@ import java.net.HttpURLConnection;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
 
     public static final String TECHNOCRAT_SIGNAL_LOG = "TechnocratSignal";
     Camera cam = null;
-    IStatusServer server = null;
+    StatusServer server = null;
     CustomView bs = null;
-
+    HashMap<String,Boolean> choices;
+    private boolean notificationsPicked;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
+        initializeServer();
+        initializeTechnocratSignalViewAndServerPoll();
+    }
 
-        initializeTechnocratSignalView();
-
-        if( initializeServer() ) {
-            while (true) {
-                try {
-                    new CheckTechnocratSignalTask().execute();
-                    Thread.sleep(10 * 1000);
-                } catch (Exception e) {
-                    Log.d(TECHNOCRAT_SIGNAL_LOG, "Thread sleep failed");
-                }
+    public void validateNewValues( HashMap<String,Boolean> newValues ) {
+        // Check to see if we have selected an item which is now on
+        for (String k : newValues.keySet()) {
+            if (newValues.get(k) &&
+                    choices.get(k)) {
+                // Turn on the technocrat signal!!!
+                bs.setTechnocratSignalState(true, "Alert!");
             }
         }
     }
 
+    private void initializeServer() {
 
-    private boolean initializeServer() {
-
-        boolean rv = false;
+        server = StatusServer.getServer();
 
         Button loadServerButton = (Button) findViewById(R.id.loadServerButton);
         loadServerButton.setOnClickListener(
@@ -77,67 +80,17 @@ public class MainActivity extends AppCompatActivity {
                         EditText serverEditText = (EditText) findViewById(R.id.technocratSignalServer);
                         String serverUrl = serverEditText.getText().toString();
 
-                        server = StatusServer.getServer();
                         server.setUrl(serverUrl);
-
-                        if( server.test() ) {
-                            // It tested, now get the options.
-                            String[] options = server.getOptions();
-                            if( null != options && options.length > 0 ) {
-                                checkedOptions = new boolean[options.length];
-                                pickNotifications(options);
-                            }
-                            else {
-                                Toast.makeText( getApplicationContext(),
-                                        "The server did not return any options", Toast.LENGTH_LONG );
-
-                            }
-                        }
-                        else {
-                            Toast.makeText( getApplicationContext(),
-                                    "Please check your server settings", Toast.LENGTH_LONG );
-                        }
+                        new InitTechnocratSignalTask().execute( server );
 
                     }
                 });
-
-        return rv;
-    }
-
-    boolean[] checkedOptions = null;
-
-    private void pickNotifications(String[] options) {
-        // Respect: http://stackoverflow.com/questions/32323605/how-do-i-control-on-multichoice-alertdialog
-        AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
-
-        final List<String> colorsList = Arrays.asList(options);
-
-        builder.setMultiChoiceItems(options, null, new DialogInterface.OnMultiChoiceClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which, boolean isChecked) {
-                checkedOptions[which] = isChecked;
-                String currentItem = colorsList.get(which);
-                Toast.makeText(getApplicationContext(),
-                        currentItem + " " + isChecked, Toast.LENGTH_SHORT).show();
-            }
-        });
-
-        builder.setCancelable(false);
-        builder.setTitle(R.string.pick_group);
-
-        builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                dialog.dismiss();
-            }
-        });
-
-        AlertDialog dialog = builder.create();
-        dialog.show();
     }
 
 
-    private void initializeTechnocratSignalView() {
+
+
+    private void initializeTechnocratSignalViewAndServerPoll() {
 
         bs = (CustomView)findViewById(R.id.technocratSignal);
 
@@ -147,10 +100,22 @@ public class MainActivity extends AppCompatActivity {
 
                 // Download the picture.
                 downloadPicture();
+                int count = 0;
 
                 while( true ) {
                     try {
                         new LongOperation().execute();
+
+                        if (server.isInitialized() && notificationsPicked ) {
+//                                new PollTechnocratSignalTask().execute();
+                            if( count == 50 ) {
+                                bs.setTechnocratSignalState( true, "Technocrat signal!");
+                            }
+                            count++;
+                        }
+//
+
+
                         Thread.sleep(100);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
@@ -180,52 +145,115 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void downloadPicture() {
-        String url = "http://blog.teddyhyde.com/assets/images/teddyhyde_96x96.png";
+        // Icons made http://www.flaticon.com/authors/dave-gandy" title="Dave Gandy">Dave Gandy</a> from
+        // <a href="http://www.flaticon.com" title="Flaticon">www.flaticon.com</a> is licensed by <a href="http://creativecommons.org/licenses/by/3.0/" title="Creative Commons BY 3.0" target="_blank">CC 3.0 BY</a></div>
+
+        String url = "http://blog.teddyhyde.com/assets/images/code-fork-symbol.png";
         Bitmap bmp = getBitmapFromURL( url );
         bs.setBmp(bmp);
     }
 
-    private class LongOperation extends AsyncTask<Void, Void, Boolean> {
+
+    private class InitTechnocratSignalTask extends AsyncTask<StatusServer, Void, Boolean> {
+
+        protected Boolean doInBackground(StatusServer... servers) {
+
+            StatusServer server = servers[0];
+            Boolean rv = false;
+            if( server.test() ) {
+                // It tested, now get the options.
+                choices = server.poll();
+                if( null != choices && choices.size() > 0 ) {
+                    rv = true;
+                }
+            }
+
+            return rv;
+        }
+
+
+
+        @Override
+        protected void onPostExecute( Boolean result ) {
+            if( result  ) {
+                pickNotifications();
+            }
+            else {
+                Toast.makeText( getApplicationContext(),
+                        "Please check your server settings", Toast.LENGTH_LONG );
+            }
+        }
+    }
+
+    private void pickNotifications() {
+        // Respect: http://stackoverflow.com/questions/32323605/how-do-i-control-on-multichoice-alertdialog
+        AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+
+        final Set<String> keys = choices.keySet();
+        final String[] choicesAsString = keys.toArray(new String[keys.size()]);
+
+        builder.setMultiChoiceItems(choicesAsString, null, new DialogInterface.OnMultiChoiceClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which, boolean isChecked) {
+                String selected = choicesAsString[which];
+                choices.put( selected, isChecked );
+                Toast.makeText(getApplicationContext(),
+                        selected + " " + isChecked, Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        builder.setCancelable(false);
+        builder.setTitle(R.string.pick_group);
+
+        builder.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                notificationsPicked = true;
+                dialog.dismiss();
+            }
+        });
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+    }
+
+    private class LongOperation extends AsyncTask<Void,Void,Boolean> {
+
         @Override
         protected Boolean doInBackground(Void... params) {
             return true;
         }
 
         @Override
-        protected void onCancelled( Boolean rv ) {
-            Log.v( TECHNOCRAT_SIGNAL_LOG, "OK, this failed");
-        }
-
-        @Override
-        protected void onPostExecute( Boolean rv ) {
-            if( rv ) {
-                bs.update();
-            }
+        protected void onPostExecute( Boolean result ) {
+            bs.update();
         }
     }
 
 
-    private class CheckTechnocratSignalTask extends AsyncTask<Void, Void, String> {
+    private class PollTechnocratSignalTask extends AsyncTask<StatusServer, Void, Boolean> {
 
-        @Override
-        protected String doInBackground(Void... params) {
+        HashMap<String, Boolean> newValues;
 
+        protected Boolean doInBackground(StatusServer... servers) {
+
+            StatusServer server = servers[0];
             try {
-                server.poll();
-            }
-            catch( Exception e ) {
-                Log.d( TECHNOCRAT_SIGNAL_LOG, "Got an exception: " + e.toString() );
+                newValues = server.poll();
+            } catch (Exception e) {
+                Log.d(MainActivity.TECHNOCRAT_SIGNAL_LOG, "Got an exception: " + e.toString());
             }
 
             return null;
         }
 
-        protected String onPostExecute(Boolean result) {
-            return null;
+        @Override
+        protected void onPostExecute(Boolean result) {
+            if (result) {
+                validateNewValues( newValues );
+            }
         }
-
     }
-
 
 
     private void turnFlashlightOff() {
