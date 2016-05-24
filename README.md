@@ -9,6 +9,11 @@ Accompanies the [technocrat-signal](/xrd/technocrat-signal) project from the O'R
 
 ### Enter the hubot status IP
 
+```
+$ docker-machine ip technocrat
+192.168.99.100
+```
+
 ![Enter status IP](imgs/status.png)
 
 ### Choose your channels
