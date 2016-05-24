@@ -1,0 +1,6 @@
+android:
+  build: .
+  volumes:
+  - .:/src
+  - ./android-utils:/usr/local/android-utils
+  working_dir: /src
