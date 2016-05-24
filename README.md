@@ -5,18 +5,18 @@ Accompanies the [technocrat-signal](/xrd/technocrat-signal) project from the O'R
 
 ### All is well, the city is sleeping..
 
-![The city is sleeping](imgs/sleeping.jpg)
+![The city is sleeping](imgs/sleeping.png)
 
 ### Enter the hubot status IP
 
-![Enter status IP](imgs/status.jpg)
+![Enter status IP](imgs/status.png)
 
 ### Choose your channels
 
-![Choose the channels](imgs/signals.jpg)
+![Choose the channels](imgs/signals.png)
 
 ### The Technocrat Signal! Someone needs help!
 
-![The Technocrat Signal](imgs/technocrat-signal.jpg)
+![The Technocrat Signal](imgs/technocrat-signal.png)
 
 
