@@ -54,7 +54,7 @@ public class MainActivity extends AppCompatActivity {
                     count++;
                 }
 
-                new LongOperation().execute();
+                // new LongOperation().execute();
                 bs.update();
 
                 Thread.sleep( 100 );
