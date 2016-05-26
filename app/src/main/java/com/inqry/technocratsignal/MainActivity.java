@@ -40,29 +40,33 @@ public class MainActivity extends AppCompatActivity {
         bs = (CustomView)findViewById(R.id.technocratSignal);
         initializeServer();
 
+        // This crashes, says UI cannot be updated from outside of UI thread (makes sense).
+//        new Thread(new Runnable() {
+//            @Override
+//            public void run() {
 
-        int count = 0;
-        while( true ) {
-            try {
-                if( count == 100 ) {
-                    count = 0;
-                    if( server.isInitialized() ) {
-                        new PollTechnocratSignalTask().execute( server );
+                int count = 0;
+                while (true) {
+                    try {
+                        if (count == 100) {
+                            count = 0;
+                            if (server.isInitialized()) {
+                                new PollTechnocratSignalTask().execute(server);
+                            }
+                        } else {
+                            count++;
+                        }
+
+                        // new LongOperation().execute();
+                        bs.update();
+
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
                     }
+
                 }
-                else {
-                    count++;
-                }
-
-                // new LongOperation().execute();
-                bs.update();
-
-                Thread.sleep( 100 );
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-
-        }
+//            }}).start();
 
     }
 
