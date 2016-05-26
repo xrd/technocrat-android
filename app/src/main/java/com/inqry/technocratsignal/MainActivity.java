@@ -101,6 +101,7 @@ public class MainActivity extends AppCompatActivity {
                 // Download the picture.
                 downloadPicture();
                 int count = 0;
+                boolean signalOn = false;
 
                 while( true ) {
                     try {
@@ -108,10 +109,17 @@ public class MainActivity extends AppCompatActivity {
 
                         if (server.isInitialized() && notificationsPicked ) {
 //                                new PollTechnocratSignalTask().execute();
-                            if( count == 50 ) {
+                            if( count == 90 ) {
                                 bs.setTechnocratSignalState( true, "Technocrat signal!");
+                                signalOn = true;
                             }
                             count++;
+
+                            // Can't put this here without looper, eh?
+//                            if( count > 90 && count % 10 == 0 ) {
+//                                Toast.makeText( getApplicationContext(),
+//                                        "The technocrat signa! Someone needs help!", Toast.LENGTH_SHORT ).show();
+//                            }
                         }
 //
 
@@ -180,7 +188,7 @@ public class MainActivity extends AppCompatActivity {
             }
             else {
                 Toast.makeText( getApplicationContext(),
-                        "Please check your server settings", Toast.LENGTH_LONG );
+                        "Please check your server settings", Toast.LENGTH_LONG ).show();
             }
         }
     }
