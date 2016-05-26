@@ -2,7 +2,6 @@ package com.inqry.technocratsignal;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
-import android.app.Dialog;
 import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -14,28 +13,14 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.RelativeLayout;
-import android.widget.Spinner;
 import android.widget.Toast;
-
-import com.google.gson.Gson;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
@@ -52,8 +37,33 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
+        bs = (CustomView)findViewById(R.id.technocratSignal);
         initializeServer();
-        initializeTechnocratSignalViewAndServerPoll();
+
+
+        int count = 0;
+        while( true ) {
+            try {
+                if( count == 100 ) {
+                    count = 0;
+                    if( server.isInitialized() ) {
+                        new PollTechnocratSignalTask().execute( server );
+                    }
+                }
+                else {
+                    count++;
+                }
+
+                new LongOperation().execute();
+                bs.update();
+
+                Thread.sleep( 100 );
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+        }
+
     }
 
     public void validateNewValues( HashMap<String,Boolean> newValues ) {
@@ -65,6 +75,15 @@ public class MainActivity extends AppCompatActivity {
                 bs.setTechnocratSignalState(true, "Alert!");
             }
         }
+
+//        if (server.isInitialized() && notificationsPicked ) {
+////                                new PollTechnocratSignalTask().execute();
+//            if( count == 50 ) {
+//                bs.setTechnocratSignalState( true, "Technocrat signal!");
+//            }
+//            count++;
+//        }
+////
     }
 
     private void initializeServer() {
@@ -85,46 +104,6 @@ public class MainActivity extends AppCompatActivity {
 
                     }
                 });
-    }
-
-
-
-
-    private void initializeTechnocratSignalViewAndServerPoll() {
-
-        bs = (CustomView)findViewById(R.id.technocratSignal);
-
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-
-                // Download the picture.
-                downloadPicture();
-                int count = 0;
-
-                while( true ) {
-                    try {
-                        new LongOperation().execute();
-
-                        if (server.isInitialized() && notificationsPicked ) {
-//                                new PollTechnocratSignalTask().execute();
-                            if( count == 50 ) {
-                                bs.setTechnocratSignalState( true, "Technocrat signal!");
-                            }
-                            count++;
-                        }
-//
-
-
-                        Thread.sleep(100);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
-
-            }
-        }).start();
-
     }
 
 
@@ -161,6 +140,10 @@ public class MainActivity extends AppCompatActivity {
             StatusServer server = servers[0];
             Boolean rv = false;
             if( server.test() ) {
+
+                // Download the picture.
+                downloadPicture();
+
                 // It tested, now get the options.
                 choices = server.poll();
                 if( null != choices && choices.size() > 0 ) {
@@ -225,7 +208,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         @Override
-        protected void onPostExecute( Boolean result ) {
+        protected void onPostExecute( Boolean success ) {
             bs.update();
         }
     }
