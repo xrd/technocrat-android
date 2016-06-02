@@ -89,19 +89,21 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void validateNewValues( HashMap<String,Boolean> newValues ) {
-        // Check to see if we have selected an item which is now on
-        for (String k : newValues.keySet()) {
-            boolean newValue = newValues.get(k);
-            boolean choiceValue = choices.get(k);
+        if( null != choices ) {
+            // Check to see if we have selected an item which is now on
+            for (String k : newValues.keySet()) {
+                    Boolean newValue = newValues.get(k);
+                    Boolean choiceValue = choices.get(k);
 
-            if ( newValue && choiceValue ) {
-                // Turn on the technocrat signal!!!
-                bs.setTechnocratSignalState(true, "Alert!");
-                technocratSignalOn = true;
+                    if ( newValue && choiceValue ) {
+                        // Turn on the technocrat signal!!!
+                        bs.setTechnocratSignalState(true, "Alert!");
+                        technocratSignalOn = true;
 
-                // Change the button to be "Turn Off"
-                loadServerOrTurnOffButton.setText( getString( R.string.turn_off ) );
+                        // Change the button to be "Turn Off"
+                        loadServerOrTurnOffButton.setText(getString(R.string.turn_off));
 
+                }
             }
         }
 
@@ -120,10 +122,11 @@ public class MainActivity extends AppCompatActivity {
                         @SuppressLint("ShowToast")
                         @Override
                         public void onClick(View v) {
-                            if (technocratSignalOn) {
+                            if( technocratSignalOn ) {
                                 // Turn the signal off
                                 technocratSignalOn = false;
                                 bs.setTechnocratSignalState( false, "" );
+                                choices = null;
                                 // reset the text
                                 loadServerOrTurnOffButton.setText( getString( R.string.load_server ));;
                             } else {
@@ -167,6 +170,8 @@ public class MainActivity extends AppCompatActivity {
 
     private class InitTechnocratSignalTask extends AsyncTask<StatusServer, Void, Boolean> {
 
+        private HashMap<String, Boolean> options;
+
         protected Boolean doInBackground(StatusServer... servers) {
 
             StatusServer server = servers[0];
@@ -177,8 +182,8 @@ public class MainActivity extends AppCompatActivity {
                 downloadPicture();
 
                 // It tested, now get the options.
-                choices = server.poll();
-                if( null != choices && choices.size() > 0 ) {
+                options = server.poll();
+                if( null != options && options.size() > 0 ) {
                     rv = true;
                 }
             }
@@ -191,7 +196,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute( Boolean result ) {
             if( result  ) {
-                pickNotifications();
+                pickNotifications( options );
             }
             else {
                 Toast.makeText( getApplicationContext(),
@@ -200,20 +205,23 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void pickNotifications() {
+    private void pickNotifications( HashMap<String,Boolean> options ) {
         // Respect: http://stackoverflow.com/questions/32323605/how-do-i-control-on-multichoice-alertdialog
         AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
 
-        final Set<String> keys = choices.keySet();
+        // Don't save the choices until we close the dialog
+        final HashMap<String,Boolean> consideredChoices = new HashMap<>();
+
+        final Set<String> keys = options.keySet();
         final String[] choicesAsString = keys.toArray(new String[keys.size()]);
 
         builder.setMultiChoiceItems(choicesAsString, null, new DialogInterface.OnMultiChoiceClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which, boolean isChecked) {
                 String selected = choicesAsString[which];
-                choices.put( selected, isChecked );
-                Toast.makeText(getApplicationContext(),
-                        selected + " " + isChecked, Toast.LENGTH_SHORT).show();
+                consideredChoices.put( selected, isChecked );
+//                Toast.makeText(getApplicationContext(),
+//                        selected + " " + isChecked, Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -224,6 +232,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 notificationsPicked = true;
+                choices = consideredChoices;
                 dialog.dismiss();
             }
         });
