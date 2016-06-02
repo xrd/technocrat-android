@@ -200,7 +200,7 @@ public class MainActivity extends AppCompatActivity {
             }
             else {
                 Toast.makeText( getApplicationContext(),
-                        "Please check your server settings", Toast.LENGTH_LONG );
+                        "Please check your server settings", Toast.LENGTH_LONG ).show();
             }
         }
     }
