@@ -4,6 +4,8 @@
     <string name="cancel">Cancel</string>
     <string name="ok">OK</string>
     <string name="pick_group">Which signals will you monitor?</string>
+    <string name="load_server">Load Server</string>
+    <string name="turn_off">Turn Off Signal</string>
     <string-array
         name="choices">
         <item>one</item>

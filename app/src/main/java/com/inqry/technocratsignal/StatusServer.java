@@ -84,10 +84,12 @@ public class StatusServer implements IStatusServer {
             Iterator<?> keys = jobj.keys();
             while( keys.hasNext() ) {
                 String key = (String) keys.next();
+                // Skip the initialized information in the JSON, but use everything else as a key
                 if (! "initialized".equals( key ) ) {
                     if ( jobj.get(key) instanceof String ) {
                         String trueFalseString = (String)jobj.get(key);
-                        newValues.put( key, trueFalseString.equalsIgnoreCase( "true" ) );
+                        boolean realBoolean = trueFalseString.equalsIgnoreCase( "on" );
+                        newValues.put( key, realBoolean );
                     }
                 }
             }

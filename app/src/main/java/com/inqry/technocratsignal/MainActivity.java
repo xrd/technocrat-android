@@ -22,6 +22,10 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.util.HashMap;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RunnableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -31,6 +35,7 @@ public class MainActivity extends AppCompatActivity {
     CustomView bs = null;
     HashMap<String,Boolean> choices;
     private boolean notificationsPicked;
+    private boolean technocratSignalOn = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,24 +46,37 @@ public class MainActivity extends AppCompatActivity {
         initializeServer();
 
         // This crashes, says UI cannot be updated from outside of UI thread (makes sense).
-//        new Thread(new Runnable() {
-//            @Override
-//            public void run() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
 
                 int count = 0;
                 while (true) {
                     try {
-                        if (count == 100) {
+                        if( count % 100 == 0 ) {
                             count = 0;
                             if (server.isInitialized()) {
                                 new PollTechnocratSignalTask().execute(server);
                             }
-                        } else {
-                            count++;
+                        }
+                        if( technocratSignalOn ) {
+                            if (count % 20 == 0 ) {
+                                turnFlashlightOff();
+                            }
+                            else if( count % 10 == 0 ) {
+                                turnFlashlightOn();
+                            }
                         }
 
-                        // new LongOperation().execute();
-                        bs.update();
+                        count++;
+
+//                         new LongOperation().execute();
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                bs.update();
+                            }
+                        });
 
                         Thread.sleep(100);
                     } catch (InterruptedException e) {
@@ -66,48 +84,58 @@ public class MainActivity extends AppCompatActivity {
                     }
 
                 }
-//            }}).start();
+            }}).start();
 
     }
 
     public void validateNewValues( HashMap<String,Boolean> newValues ) {
         // Check to see if we have selected an item which is now on
         for (String k : newValues.keySet()) {
-            if (newValues.get(k) &&
-                    choices.get(k)) {
+            boolean newValue = newValues.get(k);
+            boolean choiceValue = choices.get(k);
+
+            if ( newValue && choiceValue ) {
                 // Turn on the technocrat signal!!!
                 bs.setTechnocratSignalState(true, "Alert!");
+                technocratSignalOn = true;
+
+                // Change the button to be "Turn Off"
+                loadServerOrTurnOffButton.setText( getString( R.string.turn_off ) );
+
             }
         }
 
-//        if (server.isInitialized() && notificationsPicked ) {
-////                                new PollTechnocratSignalTask().execute();
-//            if( count == 50 ) {
-//                bs.setTechnocratSignalState( true, "Technocrat signal!");
-//            }
-//            count++;
-//        }
-////
     }
+
+    private Button loadServerOrTurnOffButton;
 
     private void initializeServer() {
 
         server = StatusServer.getServer();
 
-        Button loadServerButton = (Button) findViewById(R.id.loadServerButton);
-        loadServerButton.setOnClickListener(
-                new View.OnClickListener() {
-                    @SuppressLint("ShowToast")
-                    @Override
-                    public void onClick(View v) {
-                        EditText serverEditText = (EditText) findViewById(R.id.technocratSignalServer);
-                        String serverUrl = serverEditText.getText().toString();
+        loadServerOrTurnOffButton = (Button) findViewById(R.id.loadServerButton);
+        if( null != loadServerOrTurnOffButton ) {
+            loadServerOrTurnOffButton.setOnClickListener(
+                    new View.OnClickListener() {
+                        @SuppressLint("ShowToast")
+                        @Override
+                        public void onClick(View v) {
+                            if (technocratSignalOn) {
+                                // Turn the signal off
+                                technocratSignalOn = false;
+                                bs.setTechnocratSignalState( false, "" );
+                                // reset the text
+                                loadServerOrTurnOffButton.setText( getString( R.string.load_server ));;
+                            } else {
+                                EditText serverEditText = (EditText) findViewById(R.id.technocratSignalServer);
+                                String serverUrl = serverEditText.getText().toString();
 
-                        server.setUrl(serverUrl);
-                        new InitTechnocratSignalTask().execute( server );
-
-                    }
-                });
+                                server.setUrl(serverUrl);
+                                new InitTechnocratSignalTask().execute(server);
+                            }
+                        }
+                    });
+        }
     }
 
 
@@ -204,20 +232,6 @@ public class MainActivity extends AppCompatActivity {
         dialog.show();
     }
 
-    private class LongOperation extends AsyncTask<Void,Void,Boolean> {
-
-        @Override
-        protected Boolean doInBackground(Void... params) {
-            return true;
-        }
-
-        @Override
-        protected void onPostExecute( Boolean success ) {
-            bs.update();
-        }
-    }
-
-
     private class PollTechnocratSignalTask extends AsyncTask<StatusServer, Void, Boolean> {
 
         HashMap<String, Boolean> newValues;
@@ -231,7 +245,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(MainActivity.TECHNOCRAT_SIGNAL_LOG, "Got an exception: " + e.toString());
             }
 
-            return null;
+            return true;
         }
 
         @Override
@@ -244,16 +258,25 @@ public class MainActivity extends AppCompatActivity {
 
 
     private void turnFlashlightOff() {
-        cam.stopPreview();
-        cam.release();
+        if( null != cam ) {
+            cam.stopPreview();
+            cam.release();
+        }
     }
 
     private void turnFlashlightOn() {
-        cam = Camera.open();
-        Camera.Parameters p = cam.getParameters();
-        p.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
-        cam.setParameters(p);
-        cam.startPreview();
+        try {
+            cam = Camera.open();
+            if (null != cam) {
+                Camera.Parameters p = cam.getParameters();
+                p.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+                cam.setParameters(p);
+                cam.startPreview();
+            }
+        }
+        catch( RuntimeException rune ) {
+            Log.v( TECHNOCRAT_SIGNAL_LOG, "Camera failed to open" );
+        }
     }
 
 
