@@ -2,7 +2,6 @@ package com.inqry.technocratsignal;
 
 import android.annotation.SuppressLint;
 import android.app.AlertDialog;
-import android.app.Dialog;
 import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -14,29 +13,19 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.RelativeLayout;
-import android.widget.Spinner;
 import android.widget.Toast;
-
-import com.google.gson.Gson;
-
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RunnableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -46,93 +35,110 @@ public class MainActivity extends AppCompatActivity {
     CustomView bs = null;
     HashMap<String,Boolean> choices;
     private boolean notificationsPicked;
+    private boolean technocratSignalOn = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
-        initializeServer();
-        initializeTechnocratSignalViewAndServerPoll();
-    }
-
-    public void validateNewValues( HashMap<String,Boolean> newValues ) {
-        // Check to see if we have selected an item which is now on
-        for (String k : newValues.keySet()) {
-            if (newValues.get(k) &&
-                    choices.get(k)) {
-                // Turn on the technocrat signal!!!
-                bs.setTechnocratSignalState(true, "Alert!");
-            }
-        }
-    }
-
-    private void initializeServer() {
-
-        server = StatusServer.getServer();
-
-        Button loadServerButton = (Button) findViewById(R.id.loadServerButton);
-        loadServerButton.setOnClickListener(
-                new View.OnClickListener() {
-                    @SuppressLint("ShowToast")
-                    @Override
-                    public void onClick(View v) {
-                        EditText serverEditText = (EditText) findViewById(R.id.technocratSignalServer);
-                        String serverUrl = serverEditText.getText().toString();
-
-                        server.setUrl(serverUrl);
-                        new InitTechnocratSignalTask().execute( server );
-
-                    }
-                });
-    }
-
-
-
-
-    private void initializeTechnocratSignalViewAndServerPoll() {
-
         bs = (CustomView)findViewById(R.id.technocratSignal);
+        initializeServer();
 
+        // This crashes, says UI cannot be updated from outside of UI thread (makes sense).
         new Thread(new Runnable() {
             @Override
             public void run() {
 
-                // Download the picture.
-                downloadPicture();
                 int count = 0;
-                boolean signalOn = false;
-
-                while( true ) {
+                while (true) {
                     try {
-                        new LongOperation().execute();
-
-                        if (server.isInitialized() && notificationsPicked ) {
-//                                new PollTechnocratSignalTask().execute();
-                            if( count == 90 ) {
-                                bs.setTechnocratSignalState( true, "Technocrat signal!");
-                                signalOn = true;
+                        if( count % 100 == 0 ) {
+                            count = 0;
+                            if (server.isInitialized()) {
+                                new PollTechnocratSignalTask().execute(server);
                             }
-                            count++;
-
-                            // Can't put this here without looper, eh?
-//                            if( count > 90 && count % 10 == 0 ) {
-//                                Toast.makeText( getApplicationContext(),
-//                                        "The technocrat signa! Someone needs help!", Toast.LENGTH_SHORT ).show();
-//                            }
                         }
-//
+                        if( technocratSignalOn ) {
+                            if (count % 20 == 0 ) {
+                                turnFlashlightOff();
+                            }
+                            else if( count % 10 == 0 ) {
+                                turnFlashlightOn();
+                            }
+                        }
 
+                        count++;
+
+//                         new LongOperation().execute();
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                bs.update();
+                            }
+                        });
 
                         Thread.sleep(100);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
+
                 }
+            }}).start();
 
+    }
+
+    public void validateNewValues( HashMap<String,Boolean> newValues ) {
+        if( null != choices ) {
+            // Check to see if we have selected an item which is now on
+            for (String k : newValues.keySet()) {
+                    Boolean newValue = newValues.get(k);
+                    Boolean choiceValue = choices.get(k);
+
+                    if ( newValue && choiceValue ) {
+                        // Turn on the technocrat signal!!!
+                        bs.setTechnocratSignalState(true, "Alert!");
+                        technocratSignalOn = true;
+
+                        // Change the button to be "Turn Off"
+                        loadServerOrTurnOffButton.setText(getString(R.string.turn_off));
+
+                }
             }
-        }).start();
+        }
 
+    }
+
+    private Button loadServerOrTurnOffButton;
+
+    private void initializeServer() {
+
+        server = StatusServer.getServer();
+
+        loadServerOrTurnOffButton = (Button) findViewById(R.id.loadServerButton);
+        if( null != loadServerOrTurnOffButton ) {
+            loadServerOrTurnOffButton.setOnClickListener(
+                    new View.OnClickListener() {
+                        @SuppressLint("ShowToast")
+                        @Override
+                        public void onClick(View v) {
+                            if( technocratSignalOn ) {
+                                // Turn the signal off
+                                technocratSignalOn = false;
+                                bs.setTechnocratSignalState( false, "" );
+                                choices = null;
+                                // reset the text
+                                loadServerOrTurnOffButton.setText( getString( R.string.load_server ));;
+                            } else {
+                                EditText serverEditText = (EditText) findViewById(R.id.technocratSignalServer);
+                                String serverUrl = serverEditText.getText().toString();
+
+                                server.setUrl(serverUrl);
+                                new InitTechnocratSignalTask().execute(server);
+                            }
+                        }
+                    });
+        }
     }
 
 
@@ -164,14 +170,20 @@ public class MainActivity extends AppCompatActivity {
 
     private class InitTechnocratSignalTask extends AsyncTask<StatusServer, Void, Boolean> {
 
+        private HashMap<String, Boolean> options;
+
         protected Boolean doInBackground(StatusServer... servers) {
 
             StatusServer server = servers[0];
             Boolean rv = false;
             if( server.test() ) {
+
+                // Download the picture.
+                downloadPicture();
+
                 // It tested, now get the options.
-                choices = server.poll();
-                if( null != choices && choices.size() > 0 ) {
+                options = server.poll();
+                if( null != options && options.size() > 0 ) {
                     rv = true;
                 }
             }
@@ -184,7 +196,7 @@ public class MainActivity extends AppCompatActivity {
         @Override
         protected void onPostExecute( Boolean result ) {
             if( result  ) {
-                pickNotifications();
+                pickNotifications( options );
             }
             else {
                 Toast.makeText( getApplicationContext(),
@@ -193,20 +205,23 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void pickNotifications() {
+    private void pickNotifications( HashMap<String,Boolean> options ) {
         // Respect: http://stackoverflow.com/questions/32323605/how-do-i-control-on-multichoice-alertdialog
         AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
 
-        final Set<String> keys = choices.keySet();
+        // Don't save the choices until we close the dialog
+        final HashMap<String,Boolean> consideredChoices = new HashMap<>();
+
+        final Set<String> keys = options.keySet();
         final String[] choicesAsString = keys.toArray(new String[keys.size()]);
 
         builder.setMultiChoiceItems(choicesAsString, null, new DialogInterface.OnMultiChoiceClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which, boolean isChecked) {
                 String selected = choicesAsString[which];
-                choices.put( selected, isChecked );
-                Toast.makeText(getApplicationContext(),
-                        selected + " " + isChecked, Toast.LENGTH_SHORT).show();
+                consideredChoices.put( selected, isChecked );
+//                Toast.makeText(getApplicationContext(),
+//                        selected + " " + isChecked, Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -217,6 +232,7 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 notificationsPicked = true;
+                choices = consideredChoices;
                 dialog.dismiss();
             }
         });
@@ -224,20 +240,6 @@ public class MainActivity extends AppCompatActivity {
         AlertDialog dialog = builder.create();
         dialog.show();
     }
-
-    private class LongOperation extends AsyncTask<Void,Void,Boolean> {
-
-        @Override
-        protected Boolean doInBackground(Void... params) {
-            return true;
-        }
-
-        @Override
-        protected void onPostExecute( Boolean result ) {
-            bs.update();
-        }
-    }
-
 
     private class PollTechnocratSignalTask extends AsyncTask<StatusServer, Void, Boolean> {
 
@@ -252,7 +254,7 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(MainActivity.TECHNOCRAT_SIGNAL_LOG, "Got an exception: " + e.toString());
             }
 
-            return null;
+            return true;
         }
 
         @Override
@@ -265,16 +267,25 @@ public class MainActivity extends AppCompatActivity {
 
 
     private void turnFlashlightOff() {
-        cam.stopPreview();
-        cam.release();
+        if( null != cam ) {
+            cam.stopPreview();
+            cam.release();
+        }
     }
 
     private void turnFlashlightOn() {
-        cam = Camera.open();
-        Camera.Parameters p = cam.getParameters();
-        p.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
-        cam.setParameters(p);
-        cam.startPreview();
+        try {
+            cam = Camera.open();
+            if (null != cam) {
+                Camera.Parameters p = cam.getParameters();
+                p.setFlashMode(Camera.Parameters.FLASH_MODE_TORCH);
+                cam.setParameters(p);
+                cam.startPreview();
+            }
+        }
+        catch( RuntimeException rune ) {
+            Log.v( TECHNOCRAT_SIGNAL_LOG, "Camera failed to open" );
+        }
     }
 
 
